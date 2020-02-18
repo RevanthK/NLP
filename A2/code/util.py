@@ -6,6 +6,7 @@ import math
 import nltk
 import numpy as np
 import random
+# import time
 
 from collections import Counter
 from transformers import BertTokenizer, RobertaTokenizer
@@ -65,7 +66,8 @@ class LogLinearLanguageModel:
         positions = list(range(WINDOW - 1, len(corpus)))
         random.shuffle(positions)
         total_loss = 0.0  # - sum_i ln q(y_i|x_i)
-
+        # start = time.time()
+        # print("Start timer\n")
         for ex_num, position in enumerate(positions):
             x = corpus[position-WINDOW+1:position]
             y = corpus[position]
@@ -76,6 +78,17 @@ class LogLinearLanguageModel:
             # TODO: Implement the gradient update w = w - lr * grad_w J(w).
             # The update must be sparse. Do not work with the whole vector w.
             # Use caches self.fcache and self.x2ys.
+            # w = w - lr * grad_w J(w)
+            y_ = list(self.x2ys[tuple(x)].keys())
+
+            for y_ind in y_:
+                w_i = self.fcache[tuple(x + [y_ind])]
+                y_i = self.token_to_idx[y_ind]
+                grad_w = q[y_i]
+                if self.token_to_idx[y] == y_i:
+                    grad_w = -1 + q[y_i]
+                self.w[w_i] = self.w[w_i] - self.lr * grad_w
+
 
             total_loss -= math.log(q[self.token_to_idx[y]])
 
@@ -83,11 +96,19 @@ class LogLinearLanguageModel:
                 print('%d/%d examples, avg loss %g' %
                       (ex_num + 1, len(positions), total_loss / (ex_num + 1)))
 
+        # end = time.time()
+        # print("Total time: ")
+        # print(end - start)
         return total_loss / len(positions)
 
     def compute_probs(self, x):
         # TODO: Calculate NumPy score vector q_ s.t. q_[ind(y)] = w' phi(x, y).
-        q_ = None
+
+        y = list(self.x2ys[tuple(x)].keys())
+        q_ = np.zeros(len(self.token_to_idx))
+        for k in y:
+            for w_i in self.fcache[tuple(x + [k])]:
+                q_[self.token_to_idx[k]] += self.w[w_i]
 
         return softmax(q_)
 
@@ -129,7 +150,43 @@ def basic_features1(window):
 
 
 def basic_features1_suffix3(window):
-    return {}  # TODO: Implement
+    # TODO: Implement
+    dict = {}
+    for i in range(1,4):
+        if len(window[-2]) > i:
+            s = 'c-1s1=%s^w=%s' % (window[-2][-i:], window[-1])
+            dict[s] = True
+    return dict
+
+    # return {'c-1s1=%s^w=%s' % (window[-2][-1:], window[-1]): True,
+    #         'c-1s2=%s^w=%s' % (window[-2][-2:], window[-1]): True,
+    #         'c-1s3=%s^w=%s' % (window[-2][-3:], window[-1]): True,}
+
+def basic_features2_suffix3(window):
+    # TODO: Implement
+    dict = {}
+    for i in range(1,4):
+        if len(window[-2]) > i:
+            s1 = 'c-1s1=%s^w=%s' % (window[-2][-i:], window[-1])
+            s2 = 'c-2=%s^w=%s' % (window[-3][-i:], window[-1])
+            s3 = 'c-2=%s^c-1=%s^w=%s' % (window[-3][-i:], window[-2], window[-1])
+            dict[s1] = True
+            dict[s2] = True
+            dict[s3] = True
+    return dict
+
+def basic_features2_prefix3(window):
+    # TODO: Implement
+    dict = {}
+    for i in range(1,4):
+        if len(window[-2]) > i:
+            s1 = 'c-1s1=%s^w=%s' % (window[-2][0:i], window[-1])
+            s2 = 'c-2=%s^w=%s' % (window[-3][0:i], window[-1])
+            s3 = 'c-2=%s^c-1=%s^w=%s' % (window[-3][0:i], window[-2], window[-1])
+            dict[s1] = True
+            dict[s2] = True
+            dict[s3] = True
+    return dict
 
 
 def extract_features(training_corpus, feature_extractor):
@@ -162,7 +219,10 @@ def extract_features(training_corpus, feature_extractor):
 
 
 def softmax(v):
-    return None  # TODO: Implement
+    # TODO: Implement
+    v_max = np.max(v)
+    sum = np.sum(np.exp(v - v_max))
+    return np.exp(v - v_max) / sum
 
 
 class Tokenizer:

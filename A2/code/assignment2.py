@@ -2,6 +2,7 @@
 
 import argparse
 import util
+import sys
 
 
 def main(args):
@@ -40,6 +41,7 @@ def main(args):
     else:
         raise ValueError('Unknown feature extractor type.')
 
+    # for feature_extractor in [util.basic_features1, util.basic_features2, util.basic_features1_suffix3, util.basic_features2_prefix3, util.basic_features2_suffix3]:
     # We'll cheat and cache features for validation data to make things faster
     # for this assignment. The correct thing to do here would be
     #
@@ -53,27 +55,38 @@ def main(args):
     print('%d feature values cached for %d window types' %
           (num_feats_cached, len(fcache)))
 
-    # The language model assumes a trucated vocab and a feature definition.
-    lm = util.LogLinearLanguageModel(args.model, vocab, args.unk,
-                                     feature_extractor, f2i, fcache, x2ys,
-                                     init=args.init, lr=args.lr,
-                                     check_interval=args.check_interval,
-                                     seed=args.seed)
+    for seed in [82, 95, 11, 29, 49, 8, 42, 36, 71, 65]:
 
-    if args.test:
-        # Load trained parameters
-        lm.load()
-    else:
-        # Estimate parameters.
-        lm.train(train_toks, val_toks, args.epochs)
 
-    val_ppl = lm.test(val_toks)
-    print('Optimized Perplexity: %f' %(val_ppl))
+        # The language model assumes a trucated vocab and a feature definition.
+        lm = util.LogLinearLanguageModel(args.model, vocab, args.unk,
+                                         feature_extractor, f2i, fcache, x2ys,
+                                         init=args.init, lr=args.lr,
+                                         check_interval=args.check_interval,
+                                         seed=seed)
+        # lm = util.LogLinearLanguageModel(args.model, vocab, args.unk,
+        #                                  feature_extractor, f2i, fcache, x2ys,
+        #                                  init=args.init, lr=args.lr,
+        #                                  check_interval=args.check_interval,
+        #                                  seed=args.seed)
 
-    print('-' * 79)
-    for (i, f, w) in lm.topK_feats(args.K):
-        print('{:10d}: {:40s} ({:8.4f})'.format(
-            i, f, w))
+        if args.test:
+            # Load trained parameters
+            lm.load()
+        else:
+            # Estimate parameters.
+            lm.train(train_toks, val_toks, args.epochs)
+
+        val_ppl = lm.test(val_toks)
+        print('Optimized Perplexity: %f' %(val_ppl))
+        sample = open('results/1.8.txt', 'a')
+        print('%f,%f' %(seed, val_ppl), file=sample)
+        sample.close()
+
+        print('-' * 79)
+        for (i, f, w) in lm.topK_feats(args.K):
+            print('{:10d}: {:40s} ({:8.4f})'.format(
+                i, f, w))
 
 
 
